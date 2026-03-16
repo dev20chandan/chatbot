@@ -8,16 +8,39 @@ export const setupSockets = (server) => {
         cors: { origin: "*", methods: ["GET", "POST"] }
     });
 
+    const extractSocketToken = (socket) => {
+        const authHeader = socket.handshake.headers.authorization;
+        const authToken = socket.handshake.auth?.token;
+        const authAuthorization = socket.handshake.auth?.authorization;
+
+        const rawToken = authHeader || authAuthorization || authToken;
+        if (!rawToken) {
+            return null;
+        }
+
+        return rawToken.startsWith('Bearer ')
+            ? rawToken.slice(7).trim()
+            : rawToken.trim();
+    };
+
     // Authentication Middleware for Sockets
     io.use(async (socket, next) => {
         try {
-            const token = socket.handshake.auth.token;
-            if (!token) throw new Error('No token');
+            const token = extractSocketToken(socket);
+
+            if (!token) throw new Error("No token");
+
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            socket.user = await User.findById(decoded.id);
+
+            const user = await User.findById(decoded.id);
+            if (!user) throw new Error("User not found");
+
+            socket.user = user;
+
             next();
         } catch (err) {
-            next(new Error('Authentication error'));
+            console.error("Socket auth error:", err.message);
+            next(new Error("Authentication error"));
         }
     });
 

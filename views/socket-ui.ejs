@@ -456,6 +456,10 @@
               <textarea id="token" placeholder="Paste JWT token"></textarea>
             </div>
             <div>
+              <label for="authHeader">Authorization Header</label>
+              <textarea id="authHeader" placeholder="Bearer YOUR_JWT_TOKEN"></textarea>
+            </div>
+            <div>
               <label for="sessionId">Session ID</label>
               <input id="sessionId" placeholder="Paste chat session id" />
             </div>
@@ -606,6 +610,7 @@
     const listenerList = document.getElementById("listenerList");
     const eventsBody = document.getElementById("eventsBody");
     const tokenInput = document.getElementById("token");
+    const authHeaderInput = document.getElementById("authHeader");
     const serverUrlInput = document.getElementById("serverUrl");
     const sessionIdInput = document.getElementById("sessionId");
     const messageInput = document.getElementById("message");
@@ -725,12 +730,24 @@
       jsonPayloadInput.value = JSON.stringify(payload, null, 2);
     }
 
-    function connectSocket() {
-      const token = tokenInput.value.trim();
-      const serverUrl = serverUrlInput.value.trim();
+    function resolveAuthValues() {
+      const rawToken = tokenInput.value.trim();
+      const rawHeader = authHeaderInput.value.trim();
+      const normalizedHeader = rawHeader || (rawToken ? `Bearer ${rawToken}` : "");
+      const normalizedToken = rawToken || normalizedHeader.replace(/^Bearer\s+/i, "").trim();
 
-      if (!token) {
-        addEventRow("client", "JWT token is required before connect", false);
+      return {
+        token: normalizedToken,
+        authorizationHeader: normalizedHeader
+      };
+    }
+
+    function connectSocket() {
+      const serverUrl = serverUrlInput.value.trim();
+      const { token, authorizationHeader } = resolveAuthValues();
+
+      if (!token && !authorizationHeader) {
+        addEventRow("client", "JWT token or Authorization header is required before connect", false);
         return;
       }
 
@@ -742,7 +759,14 @@
       addEventRow("connect", `Connecting to ${serverUrl}`, true);
 
       socket = io(serverUrl, {
-        auth: { token }
+        auth: { token, authorization: authorizationHeader },
+        transportOptions: {
+          polling: {
+            extraHeaders: authorizationHeader
+              ? { Authorization: authorizationHeader }
+              : undefined
+          }
+        }
       });
 
       socket.on("connect", () => {
@@ -789,13 +813,13 @@
     }
 
     async function uploadDocument() {
-      const token = tokenInput.value.trim();
       const serverUrl = serverUrlInput.value.trim().replace(/\/$/, "");
+      const { token, authorizationHeader } = resolveAuthValues();
       const file = documentFileInput.files[0];
 
-      if (!token) {
-        addEventRow("upload", "JWT token is required before upload", false);
-        uploadStatus.textContent = "Token required";
+      if (!token && !authorizationHeader) {
+        addEventRow("upload", "JWT token or Authorization header is required before upload", false);
+        uploadStatus.textContent = "Auth required";
         return;
       }
 
@@ -816,7 +840,7 @@
         const response = await fetch(`${serverUrl}/api/docs/upload`, {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${token}`
+            Authorization: authorizationHeader || `Bearer ${token}`
           },
           body: formData
         });

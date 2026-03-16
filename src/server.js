@@ -10,6 +10,7 @@ import connectDB from './config/db.js';
 import authRoutes from './routes/auth.route.js';
 import sessionRoutes from './routes/session.route.js';
 import documentRoutes from './routes/document.route.js';
+import memoryRoutes from './routes/memory.route.js';
 import { setupSockets } from './sockets/chat.socket.js';
 import { requestLogger } from './middlewares/requestLogger.middleware.js';
 import { errorHandler } from './middlewares/errorHandler.middleware.js';
@@ -41,8 +42,8 @@ app.use(requestLogger);
 const swaggerOptions = {
     definition: {
         openapi: '3.0.0',
-        info: { 
-            title: 'AI SaaS Chatbot API', 
+        info: {
+            title: 'AI SaaS Chatbot API',
             version: '1.0.0',
             description: 'API for Multi-User AI Chatbot with Memory and RAG'
         },
@@ -62,7 +63,17 @@ const swaggerOptions = {
     apis: ['./src/routes/*.js'], // Relative to project root (CWD in Docker)
 };
 const swaggerDocs = swaggerJsdoc(swaggerOptions);
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+app.use(
+    '/api-docs',
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerDocs, {
+        swaggerOptions: {
+            persistAuthorization: true
+        },
+        docExpansion: 'none'
+    })
+);
+
 
 // Socket.io
 setupSockets(server);
@@ -71,6 +82,7 @@ setupSockets(server);
 app.use('/api/auth', authRoutes);
 app.use('/api/chat', sessionRoutes);
 app.use('/api/docs', documentRoutes);
+app.use('/api/memories', memoryRoutes);
 
 app.get('/', (req, res) => {
     res.redirect('/socket-ui');

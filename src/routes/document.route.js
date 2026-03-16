@@ -1,7 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import { protect } from '../middlewares/auth.middleware.js';
-import { processDocument } from '../services/rag.service.js';
+import { listDocumentChunks, listDocuments, processDocument } from '../services/rag.service.js';
 
 const router = express.Router();
 const allowedMimeTypes = new Set([
@@ -18,6 +18,27 @@ const upload = multer({
         }
 
         cb(new Error('Unsupported file type. Use PDF, TXT, or DOCX.'));
+    }
+});
+
+/**
+ * @swagger
+ * /api/docs:
+ *   get:
+ *     summary: List uploaded documents for authenticated user
+ *     tags: [Documents]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Document list
+ */
+router.get('/', protect, async (req, res) => {
+    try {
+        const documents = await listDocuments(req.user.id);
+        res.status(200).json(documents);
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 
@@ -52,6 +73,33 @@ router.post('/upload', protect, upload.single('file'), async (req, res) => {
             message: 'Document processed successfully',
             filename: req.file.originalname
         });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /api/docs/{docId}/chunks:
+ *   get:
+ *     summary: List stored chunks for one uploaded document
+ *     tags: [Documents]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: docId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Document chunks
+ */
+router.get('/:docId/chunks', protect, async (req, res) => {
+    try {
+        const chunks = await listDocumentChunks(req.user.id, req.params.docId);
+        res.status(200).json(chunks);
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
