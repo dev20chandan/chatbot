@@ -1,31 +1,66 @@
-# Production Grade AI SaaS Chatbot Backend
+# AI SaaS Chatbot Backend
 
-A scalable, multi-user AI chatbot system with persistent long-term memory, RAG support, and streaming responses.
+Express and Socket.IO backend for an authenticated multi-session chatbot with memory extraction and document RAG.
 
-## 🚀 Key Features
+## Features
 
-*   **Multi-User Auth**: JWT-based registration and login.
-*   **Multi-Session Chat**: Users can have multiple independent conversations.
-*   **Auto Memory Extraction**: Uses LLM to extract personal facts from messages and stores them in MongoDB Vector Search.
-*   **Document RAG**: PDF/TXT support via vector chunking for document-based queries.
-*   **Streaming Responses**: Real-time token streaming using `Socket.io`.
-*   **Redis Layer**: Rate limiting (20 msg/min) and session caching.
-*   **Auto Titles**: Automatically generates session titles using GPT-3.5.
+- JWT auth for register/login
+- Multiple chat sessions per user
+- Streaming chat responses over Socket.IO
+- Memory extraction stored in MongoDB vector search
+- PDF/TXT document ingestion for RAG
+- Redis-backed caching and rate limiting
+- Swagger docs at `/api-docs`
 
-## 🛠️ Tech Stack
+## Tech Stack
 
-*   **Backend**: Node.js (ES), Express, Socket.io
-*   **Database**: MongoDB Atlas (Vector Search), Redis
-*   **AI**: OpenAI (GPT-4 Turbo, Text-Embedding-3-Small)
-*   **DevOps**: Docker, Docker Compose
+- Node.js, Express, Socket.IO
+- MongoDB, Redis
+- OpenAI API
+- Docker Compose
 
----
+## Environment
 
-## 🏗️ MongoDB Atlas Vector Indices
+Copy `.env.example` to `.env` and set:
 
-Create two different indices on your collections:
+```env
+PORT=5000
+MONGODB_URI=mongodb://localhost:27017/saas_chatbot
+OPENAI_API_KEY=sk-your-key
+REDIS_URL=redis://localhost:6379
+JWT_SECRET=your_super_secret_jwt_key
+NODE_ENV=development
+```
 
-### 1. `memory_index` (Collection: `memories`)
+If you use Docker Compose, `MONGODB_URI` and `REDIS_URL` are supplied by `docker-compose.yml`. You still need `OPENAI_API_KEY` and `JWT_SECRET`.
+
+## Run
+
+### Docker
+
+```bash
+docker-compose up --build
+```
+
+### Local
+
+Make sure MongoDB and Redis are running, then:
+
+```bash
+npm install
+npm run dev
+```
+
+Open Swagger at `http://localhost:5000/api-docs`.
+
+## MongoDB Vector Search
+
+This project uses MongoDB `$vectorSearch`, which requires MongoDB Atlas or an Atlas-compatible local environment. A plain local MongoDB instance will not support memory/document retrieval through vector search.
+
+Create these indices:
+
+### `memory_index` on `memories`
+
 ```json
 {
   "fields": [
@@ -35,7 +70,8 @@ Create two different indices on your collections:
 }
 ```
 
-### 2. `document_index` (Collection: `documents`)
+### `document_index` on `documents`
+
 ```json
 {
   "fields": [
@@ -45,45 +81,50 @@ Create two different indices on your collections:
 }
 ```
 
----
+## REST Flow Before Socket Use
 
-## 🛠️ Setup & Running (Full Local)
+The socket is authenticated, so you must do this first:
 
-You can run the entire stack (Node, MongoDB, Redis) locally using Docker Compose.
+1. `POST /api/auth/register` or `POST /api/auth/login`
+2. Copy the returned JWT token
+3. `POST /api/chat/sessions` with `Authorization: Bearer <token>`
+4. Copy the returned session `_id`
+5. Connect the socket with the token and emit messages using that session id
 
-1.  **Configure `.env`**:
-    Only `OPENAI_API_KEY` and `JWT_SECRET` are strictly required here if using Docker, as the DB and Redis URLs are pre-configured in the `docker-compose.yml`.
+## Socket Events
 
-2.  **Run the Stack**:
-    ```bash
-    docker-compose up --build
-    ```
+Connect with:
 
-3.  **Local Manual Run**:
-    If running without Docker, ensure you have MongoDB and Redis installed on your machine and running on their default ports, then:
-    ```bash
-    npm install
-    npm run dev
-    ```
+```js
+const socket = io("http://localhost:5000", {
+  auth: { token: "YOUR_JWT_TOKEN" }
+});
+```
 
-> [!IMPORTANT]
-> **Vector Search Note**: MongoDB's `$vectorSearch` feature is an Atlas-specific feature. To test vector functionality locally with this specific codebase, it is recommended to use the [Atlas CLI](https://www.mongodb.com/docs/atlas/cli/stable/atlas-cli-deploy-local/) to spin up a local Atlas-compatible container, OR keep the `MONGODB_URI` pointing to your Atlas cluster while keeping the App and Redis local.
+Events:
 
-4.  **API Documentation**:
-    Once running, visit `http://localhost:5000/api-docs` to view the Swagger UI.
+- Emit `send_message` with `{ sessionId, message }`
+- Listen for `chat_token` to receive streaming chunks
+- Listen for `chat_done` to receive the final full message
+- Listen for `error` for failures
 
----
+## Socket UI
 
-## 📡 Socket.io Events
+The app now renders a socket test console at `/socket-ui`.
 
-*   **Connect**: Pass token in `handshake.auth.token`.
-*   **Listen**: `chat_token` (receives partial chunks), `chat_done` (full message).
-*   **Emit**: `send_message` with `{ sessionId, message }`.
+Use it like this:
 
----
+1. Start the server
+2. Open `http://localhost:5000/socket-ui`
+3. Register or log in from Swagger/Postman/curl
+4. Paste the JWT token into the page
+5. Create a session with `POST /api/chat/sessions`
+6. Paste the returned session id into the page
+7. Connect and send a message
 
-## 📂 Structure
-- `/src/services`: Core logic (Auth, Embedding, Memory, RAG, Chat).
-- `/src/sockets`: Socket.io streaming implementation.
-- `/src/middlewares`: Auth and Redis-based Rate Limiter.
-- `/src/routes`: REST endpoints for everything.
+## Project Structure
+
+- `src/server.js`: Express app, Swagger setup, Socket.IO bootstrap
+- `src/routes/`: Auth, session, and document routes
+- `src/services/`: Chat, auth, memory, embedding, and RAG logic
+- `src/sockets/chat.socket.js`: Socket auth and streaming event handlers

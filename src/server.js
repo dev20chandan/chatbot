@@ -30,6 +30,9 @@ const server = http.createServer(app);
 app.use(helmet({ contentSecurityPolicy: false })); // Adjust for Swagger/Socket.io
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, '../views'));
 
 // 1. Request Logger (Apply before routes)
 app.use(requestLogger);
@@ -68,6 +71,16 @@ setupSockets(server);
 app.use('/api/auth', authRoutes);
 app.use('/api/chat', sessionRoutes);
 app.use('/api/docs', documentRoutes);
+
+app.get('/', (req, res) => {
+    res.redirect('/socket-ui');
+});
+
+app.get('/socket-ui', (req, res) => {
+    res.render('socket-ui', {
+        defaultServerUrl: process.env.SOCKET_UI_SERVER_URL || `http://localhost:${process.env.PORT || 5000}`,
+    });
+});
 
 // Health Check
 app.get('/health', (req, res) => res.json({ status: 'OK', timestamp: new Date() }));

@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Socket UI</title>
+  <style>
+    :root {
+      --bg: #ece9e2;
+      --panel: #f7f5ef;
+      --panel-strong: #ffffff;
+      --line: #d7d2c7;
+      --line-strong: #c7c0b3;
+      --text: #2f2d28;
+      --muted: #7a7469;
+      --accent: #d0841c;
+      --accent-strong: #b66e11;
+      --green: #1f9d55;
+      --red: #d64545;
+      --shadow: 0 14px 30px rgba(53, 45, 29, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--text);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.75), rgba(236, 233, 226, 0.95)),
+        linear-gradient(120deg, #ddd8cd, #f4f0e7);
+    }
+
+    .app-shell {
+      display: grid;
+      grid-template-columns: 260px 1fr 360px;
+      min-height: 100vh;
+    }
+
+    .sidebar,
+    .composer,
+    .events {
+      border-right: 1px solid var(--line);
+      background: rgba(247, 245, 239, 0.85);
+      backdrop-filter: blur(10px);
+    }
+
+    .events {
+      border-right: 0;
+      border-left: 1px solid var(--line);
+    }
+
+    .section {
+      padding: 16px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.55);
+    }
+
+    .header h1,
+    .section h2 {
+      margin: 0;
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: white;
+      background: var(--muted);
+    }
+
+    .badge .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.95);
+    }
+
+    .badge.connected {
+      background: var(--accent);
+    }
+
+    .badge.disconnected,
+    .badge.error {
+      background: var(--red);
+    }
+
+    .badge.connecting,
+    .badge.reconnecting,
+    .badge.disconnecting {
+      background: #66615a;
+    }
+
+    .stack {
+      display: grid;
+      gap: 12px;
+    }
+
+    .card {
+      background: var(--panel-strong);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfaf6;
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+
+    .card-body {
+      padding: 14px;
+    }
+
+    .event-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .event-item {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #fefdf9;
+      cursor: pointer;
+      transition: border-color 0.16s ease, transform 0.16s ease, background 0.16s ease;
+    }
+
+    .event-item:hover {
+      transform: translateY(-1px);
+      border-color: var(--line-strong);
+    }
+
+    .event-item.active {
+      background: #fff6ea;
+      border-color: #dca763;
+    }
+
+    .event-name {
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+
+    .event-meta {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #4b463f;
+    }
+
+    input,
+    textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font: inherit;
+      color: var(--text);
+      background: white;
+    }
+
+    textarea {
+      min-height: 92px;
+      resize: vertical;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .file-row {
+      display: grid;
+      gap: 10px;
+    }
+
+    .file-input {
+      display: block;
+      width: 100%;
+      border: 1px dashed var(--line-strong);
+      border-radius: 10px;
+      padding: 12px;
+      background: #fcfbf8;
+    }
+
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      color: white;
+      background: var(--accent);
+      transition: transform 0.16s ease, opacity 0.16s ease, background 0.16s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      background: var(--accent-strong);
+    }
+
+    button.secondary {
+      background: #55606f;
+    }
+
+    button.secondary:hover {
+      background: #43505f;
+    }
+
+    button.danger {
+      background: var(--red);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .listener {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .listener:last-child {
+      border-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .listener-name {
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+
+    .listener-help {
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    .switch {
+      position: relative;
+      width: 46px;
+      height: 26px;
+      border-radius: 999px;
+      background: #bbb5aa;
+      transition: background 0.16s ease;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .switch::after {
+      content: "";
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: white;
+      transition: transform 0.16s ease;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+    }
+
+    .switch.on {
+      background: var(--green);
+    }
+
+    .switch.on::after {
+      transform: translateX(20px);
+    }
+
+    .table-wrap {
+      overflow: auto;
+      max-height: calc(100vh - 210px);
+      border-top: 1px solid var(--line);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      background: #f4f0e8;
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    tbody td {
+      vertical-align: top;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .event-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--red);
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .event-pill::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .event-pill.ok {
+      color: var(--green);
+    }
+
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      word-break: break-word;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .meta-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .meta-box {
+      background: #f5f1e9;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+
+    .meta-label {
+      display: block;
+      color: var(--muted);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .meta-value {
+      margin-top: 4px;
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 1200px) {
+      .app-shell {
+        grid-template-columns: 240px 1fr;
+      }
+
+      .events {
+        grid-column: 1 / -1;
+        border-left: 0;
+        border-top: 1px solid var(--line);
+      }
+    }
+
+    @media (max-width: 820px) {
+      .app-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar,
+      .composer,
+      .events {
+        border-right: 0;
+        border-left: 0;
+        border-top: 1px solid var(--line);
+      }
+
+      .sidebar {
+        border-top: 0;
+      }
+
+      .grid-2,
+      .meta-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="header">
+        <h1>Emitters</h1>
+        <span id="connectionBadge" class="badge disconnected"><span class="dot"></span>Disconnected</span>
+      </div>
+
+      <div class="section stack">
+        <div class="card">
+          <div class="card-header">Connection</div>
+          <div class="card-body stack">
+            <div>
+              <label for="serverUrl">Server URL</label>
+              <input id="serverUrl" value="<%= defaultServerUrl %>" />
+            </div>
+            <div>
+              <label for="token">JWT Token</label>
+              <textarea id="token" placeholder="Paste JWT token"></textarea>
+            </div>
+            <div>
+              <label for="sessionId">Session ID</label>
+              <input id="sessionId" placeholder="Paste chat session id" />
+            </div>
+            <div class="actions">
+              <button id="connectBtn" type="button">Connect</button>
+              <button id="disconnectBtn" type="button" class="danger" disabled>Disconnect</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">Document RAG</div>
+          <div class="card-body stack">
+            <div class="file-row">
+              <div>
+                <label for="documentFile">Upload PDF, TXT, or DOCX</label>
+                <input id="documentFile" class="file-input" type="file" accept=".pdf,.txt,.docx" />
+              </div>
+              <div class="actions">
+                <button id="uploadBtn" type="button">Upload Document</button>
+              </div>
+              <div id="uploadStatus" class="muted">Upload a file, then ask questions in chat.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">Collection</div>
+          <div id="emitterList" class="card-body event-list"></div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="composer">
+      <div class="header">
+        <h1>Emitter Console</h1>
+        <div class="muted">Socket.IO chat debugger</div>
+      </div>
+
+      <div class="section stack">
+        <div class="card">
+          <div class="card-header">
+            <span id="selectedEmitterName">send_message</span>
+            <span id="selectedEmitterHint" class="muted">Chat request payload</span>
+          </div>
+          <div class="card-body stack">
+            <div class="meta-grid">
+              <div class="meta-box">
+                <span class="meta-label">Socket Status</span>
+                <div id="socketStateText" class="meta-value">disconnected</div>
+              </div>
+              <div class="meta-box">
+                <span class="meta-label">Connection ID</span>
+                <div id="socketIdText" class="meta-value mono">-</div>
+              </div>
+            </div>
+
+            <div class="grid-2">
+              <div>
+                <label for="eventName">Event</label>
+                <input id="eventName" value="send_message" />
+              </div>
+              <div>
+                <label for="emitMode">Mode</label>
+                <input id="emitMode" value="Preset payload" readonly />
+              </div>
+            </div>
+
+            <div id="presetFields" class="stack">
+              <div>
+                <label for="message">Message</label>
+                <textarea id="message" placeholder="Type the user message"></textarea>
+              </div>
+            </div>
+
+            <div>
+              <label for="jsonPayload">Raw JSON Payload</label>
+              <textarea id="jsonPayload" placeholder='{"sessionId":"...","message":"Hello"}'></textarea>
+            </div>
+
+            <div class="actions">
+              <button id="sendBtn" type="button" disabled>Emit Event</button>
+              <button id="syncBtn" type="button" class="secondary">Sync JSON</button>
+              <button id="clearComposerBtn" type="button" class="secondary">Clear</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">Listeners</div>
+          <div id="listenerList" class="card-body"></div>
+        </div>
+      </div>
+    </main>
+
+    <section class="events">
+      <div class="header">
+        <h1>Events</h1>
+        <div class="actions">
+          <button id="clearEventsBtn" type="button" class="secondary">Clear Log</button>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Event</th>
+              <th>Message</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody id="eventsBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+  <script>
+    const emitterPresets = [
+      {
+        name: "send_message",
+        description: "Emit chat input with sessionId and message",
+        buildPayload: () => ({
+          sessionId: document.getElementById("sessionId").value.trim(),
+          message: document.getElementById("message").value.trim()
+        })
+      }
+    ];
+
+    const listenerConfig = [
+      { name: "connect", description: "Socket connection established", enabled: true },
+      { name: "disconnect", description: "Socket closed by client or server", enabled: true },
+      { name: "connect_error", description: "Handshake or transport failure", enabled: true },
+      { name: "error", description: "Application level socket error", enabled: true },
+      // { name: "chat_token", description: "Streaming token chunks", enabled: true },
+      { name: "chat_done", description: "Final assistant message", enabled: true }
+    ];
+
+    let socket = null;
+    let selectedPreset = emitterPresets[0];
+
+    const connectionBadge = document.getElementById("connectionBadge");
+    const socketStateText = document.getElementById("socketStateText");
+    const socketIdText = document.getElementById("socketIdText");
+    const emitterList = document.getElementById("emitterList");
+    const listenerList = document.getElementById("listenerList");
+    const eventsBody = document.getElementById("eventsBody");
+    const tokenInput = document.getElementById("token");
+    const serverUrlInput = document.getElementById("serverUrl");
+    const sessionIdInput = document.getElementById("sessionId");
+    const messageInput = document.getElementById("message");
+    const eventNameInput = document.getElementById("eventName");
+    const jsonPayloadInput = document.getElementById("jsonPayload");
+    const connectBtn = document.getElementById("connectBtn");
+    const disconnectBtn = document.getElementById("disconnectBtn");
+    const uploadBtn = document.getElementById("uploadBtn");
+    const sendBtn = document.getElementById("sendBtn");
+    const syncBtn = document.getElementById("syncBtn");
+    const clearComposerBtn = document.getElementById("clearComposerBtn");
+    const clearEventsBtn = document.getElementById("clearEventsBtn");
+    const selectedEmitterName = document.getElementById("selectedEmitterName");
+    const selectedEmitterHint = document.getElementById("selectedEmitterHint");
+    const documentFileInput = document.getElementById("documentFile");
+    const uploadStatus = document.getElementById("uploadStatus");
+
+    function timeLabel() {
+      return new Date().toLocaleTimeString();
+    }
+
+    function addEventRow(kind, message, isSuccess) {
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td><span class="event-pill ${isSuccess ? "ok" : ""}">${kind}</span></td>
+        <td class="mono">${escapeHtml(message)}</td>
+        <td>${timeLabel()}</td>
+      `;
+      eventsBody.prepend(row);
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function formatPayload(payload) {
+      if (typeof payload === "string") return payload;
+      try {
+        return JSON.stringify(payload, null, 2);
+      } catch {
+        return String(payload);
+      }
+    }
+
+    function setConnectionState(state, extraText) {
+      connectionBadge.className = `badge ${state}`;
+      connectionBadge.innerHTML = `<span class="dot"></span>${state.charAt(0).toUpperCase() + state.slice(1)}`;
+      socketStateText.textContent = extraText || state;
+
+      const connected = state === "connected";
+      const transitional = state === "connecting" || state === "disconnecting" || state === "reconnecting";
+
+      connectBtn.disabled = connected || transitional;
+      disconnectBtn.disabled = !connected && !transitional;
+      sendBtn.disabled = !connected;
+    }
+
+    function renderEmitters() {
+      emitterList.innerHTML = "";
+
+      emitterPresets.forEach((preset) => {
+        const item = document.createElement("div");
+        item.className = `event-item ${selectedPreset.name === preset.name ? "active" : ""}`;
+        item.innerHTML = `
+          <div class="event-name">${preset.name}</div>
+          <div class="event-meta">${preset.description}</div>
+        `;
+
+        item.addEventListener("click", () => {
+          selectedPreset = preset;
+          eventNameInput.value = preset.name;
+          selectedEmitterName.textContent = preset.name;
+          selectedEmitterHint.textContent = preset.description;
+          syncPayloadFromPreset();
+          renderEmitters();
+        });
+
+        emitterList.appendChild(item);
+      });
+    }
+
+    function renderListeners() {
+      listenerList.innerHTML = "";
+
+      listenerConfig.forEach((listener) => {
+        const row = document.createElement("div");
+        row.className = "listener";
+        row.innerHTML = `
+          <div>
+            <div class="listener-name">${listener.name}</div>
+            <div class="listener-help">${listener.description}</div>
+          </div>
+          <div class="switch ${listener.enabled ? "on" : ""}" role="switch" aria-checked="${listener.enabled}"></div>
+        `;
+
+        row.querySelector(".switch").addEventListener("click", () => {
+          listener.enabled = !listener.enabled;
+          renderListeners();
+          addEventRow(listener.enabled ? "L_ON" : "L_OFF", `Listener ${listener.enabled ? "on" : "off"}: ${listener.name}`, listener.enabled);
+        });
+
+        listenerList.appendChild(row);
+      });
+    }
+
+    function listenerEnabled(name) {
+      return listenerConfig.find((listener) => listener.name === name)?.enabled;
+    }
+
+    function syncPayloadFromPreset() {
+      const payload = selectedPreset.buildPayload();
+      jsonPayloadInput.value = JSON.stringify(payload, null, 2);
+    }
+
+    function connectSocket() {
+      const token = tokenInput.value.trim();
+      const serverUrl = serverUrlInput.value.trim();
+
+      if (!token) {
+        addEventRow("client", "JWT token is required before connect", false);
+        return;
+      }
+
+      if (socket) {
+        socket.disconnect();
+      }
+
+      setConnectionState("connecting");
+      addEventRow("connect", `Connecting to ${serverUrl}`, true);
+
+      socket = io(serverUrl, {
+        auth: { token }
+      });
+
+      socket.on("connect", () => {
+        socketIdText.textContent = socket.id;
+        setConnectionState("connected");
+        if (listenerEnabled("connect")) {
+          addEventRow("connect", `Connected with id ${socket.id}`, true);
+        }
+      });
+
+      socket.on("disconnect", (reason) => {
+        socketIdText.textContent = "-";
+        setConnectionState("disconnected", `disconnected${reason ? " (" + reason + ")" : ""}`);
+        if (listenerEnabled("disconnect")) {
+          addEventRow("disconnect", reason || "Socket disconnected", false);
+        }
+      });
+
+      socket.on("connect_error", (error) => {
+        socketIdText.textContent = "-";
+        setConnectionState("error", error.message || "connect_error");
+        if (listenerEnabled("connect_error")) {
+          addEventRow("connect_error", error.message || "Handshake failed", false);
+        }
+      });
+
+      socket.on("error", (payload) => {
+        if (listenerEnabled("error")) {
+          addEventRow("error", formatPayload(payload), false);
+        }
+      });
+
+      socket.on("chat_token", (payload) => {
+        if (listenerEnabled("chat_token")) {
+          addEventRow("chat_token", formatPayload(payload), true);
+        }
+      });
+
+      socket.on("chat_done", (payload) => {
+        if (listenerEnabled("chat_done")) {
+          addEventRow("chat_done", formatPayload(payload), true);
+        }
+      });
+    }
+
+    async function uploadDocument() {
+      const token = tokenInput.value.trim();
+      const serverUrl = serverUrlInput.value.trim().replace(/\/$/, "");
+      const file = documentFileInput.files[0];
+
+      if (!token) {
+        addEventRow("upload", "JWT token is required before upload", false);
+        uploadStatus.textContent = "Token required";
+        return;
+      }
+
+      if (!file) {
+        addEventRow("upload", "Select a PDF, TXT, or DOCX file first", false);
+        uploadStatus.textContent = "No file selected";
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      uploadBtn.disabled = true;
+      uploadStatus.textContent = `Uploading ${file.name}...`;
+      addEventRow("upload", `Uploading ${file.name}`, true);
+
+      try {
+        const response = await fetch(`${serverUrl}/api/docs/upload`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`
+          },
+          body: formData
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.message || "Upload failed");
+        }
+
+        uploadStatus.textContent = `Indexed: ${result.filename || file.name}. You can now ask questions in chat.`;
+        addEventRow("upload", formatPayload(result), true);
+      } catch (error) {
+        uploadStatus.textContent = error.message;
+        addEventRow("upload", error.message, false);
+      } finally {
+        uploadBtn.disabled = false;
+      }
+    }
+
+    function disconnectSocket() {
+      if (!socket) {
+        setConnectionState("disconnected");
+        return;
+      }
+
+      setConnectionState("disconnecting");
+      addEventRow("disconnect", "Disconnect requested by client", false);
+      socket.disconnect();
+    }
+
+    function emitSelectedEvent() {
+      if (!socket || !socket.connected) {
+        addEventRow("client", "Socket is not connected", false);
+        return;
+      }
+
+      let payload;
+      try {
+        payload = JSON.parse(jsonPayloadInput.value || "{}");
+      } catch (error) {
+        addEventRow("client", `Invalid JSON payload: ${error.message}`, false);
+        return;
+      }
+
+      if (!payload.sessionId) {
+        payload.sessionId = sessionIdInput.value.trim();
+      }
+
+      const eventName = eventNameInput.value.trim() || selectedPreset.name;
+      socket.emit(eventName, payload);
+      addEventRow("emit", `${eventName} ${formatPayload(payload)}`, true);
+    }
+
+    connectBtn.addEventListener("click", connectSocket);
+    disconnectBtn.addEventListener("click", disconnectSocket);
+    uploadBtn.addEventListener("click", uploadDocument);
+    sendBtn.addEventListener("click", emitSelectedEvent);
+    syncBtn.addEventListener("click", syncPayloadFromPreset);
+    clearComposerBtn.addEventListener("click", () => {
+      messageInput.value = "";
+      jsonPayloadInput.value = "";
+    });
+    clearEventsBtn.addEventListener("click", () => {
+      eventsBody.innerHTML = "";
+    });
+
+    sessionIdInput.addEventListener("input", syncPayloadFromPreset);
+    messageInput.addEventListener("input", syncPayloadFromPreset);
+
+    renderEmitters();
+    renderListeners();
+    syncPayloadFromPreset();
+    setConnectionState("disconnected");
+  </script>
+</body>
+</html>
