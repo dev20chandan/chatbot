@@ -31,12 +31,28 @@ router.get('/sessions', protect, async (req, res) => {
  *     tags: [Sessions]
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 example: My First Chat Session
  *     responses:
  *       201:
  *         description: Session created
  */
 router.post('/sessions', protect, async (req, res) => {
-    const session = await Session.create({ userId: req.user.id });
+    const { title } = req.body;
+
+    const session = await Session.create({
+        title,
+        userId: req.user.id
+    });
+
     res.status(201).json(session);
 });
 

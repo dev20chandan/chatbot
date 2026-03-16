@@ -1,7 +1,6 @@
 import Chat from '../models/chat.model.js';
 import Session from '../models/session.model.js';
 import openai from '../config/openai.js';
-import redisClient from '../config/redis.js';
 import { generateEmbedding } from './embedding.service.js';
 import { retrieveRelevantMemories, extractAndStoreMemory } from './memory.service.js';
 import { retrieveDocumentContext } from './rag.service.js';
