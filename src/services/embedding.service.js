@@ -1,4 +1,4 @@
-import openai from '../config/openai.js';
+import openai from '../config/openrouter.js';
 
 /**
  * Generates vector embedding for a given text using OpenAI's model
@@ -8,7 +8,7 @@ import openai from '../config/openai.js';
 export const generateEmbedding = async (text) => {
     try {
         const response = await openai.embeddings.create({
-            model: "text-embedding-3-small", // or text-embedding-ada-002 as specified in dimensions (1536)
+            model: "openai/text-embedding-3-small", // or text-embedding-ada-002 as specified in dimensions (1536)
             input: text,
             encoding_format: "float",
         });

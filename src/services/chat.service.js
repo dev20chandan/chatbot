@@ -1,6 +1,6 @@
 import Chat from '../models/chat.model.js';
 import Session from '../models/session.model.js';
-import openai from '../config/openai.js';
+import openai from '../config/openrouter.js';
 import { generateEmbedding } from './embedding.service.js';
 import { retrieveRelevantMemories, extractAndStoreMemory } from './memory.service.js';
 import { retrieveDocumentContext } from './rag.service.js';
@@ -47,8 +47,9 @@ Please use the provided contexts to answer accurately.`;
 
     // 6. Streaming with OpenAI
     const stream = await openai.chat.completions.create({
-        model: "gpt-4-turbo-preview",
+        model: "openai/gpt-3.5-turbo",
         messages: messages,
+        max_tokens: 1024,
         stream: true,
     });
 
@@ -77,7 +78,7 @@ Please use the provided contexts to answer accurately.`;
 const generateSessionTitle = async (sessionId, firstMessage) => {
     try {
         const response = await openai.chat.completions.create({
-            model: "gpt-3.5-turbo",
+            model: "openai/gpt-3.5-turbo",
             messages: [{ role: "system", content: "Generate a short 3-5 word title for a chat session based on this first message." }, { role: "user", content: firstMessage }],
         });
         const title = response.choices[0].message.content.replace(/"/g, '');

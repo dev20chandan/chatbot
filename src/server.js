@@ -101,4 +101,4 @@ app.get('/health', (req, res) => res.json({ status: 'OK', timestamp: new Date() 
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`🚀 SaaS Backend running on port ${PORT}`));
+server.listen(PORT, () => console.log(`🚀 SaaS Backend running on port  http://localhost:${PORT}`));

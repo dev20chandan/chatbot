@@ -1,6 +1,6 @@
 import Memory from '../models/memory.model.js';
 import mongoose from 'mongoose';
-import openai from '../config/openai.js';
+import openai from '../config/openrouter.js';
 import { generateEmbedding } from './embedding.service.js';
 
 const normalizeUserId = (userId) => {
@@ -22,7 +22,8 @@ Message: "${message}"
 Facts (bullet points):`;
 
         const completion = await openai.chat.completions.create({
-            model: "gpt-3.5-turbo",
+            model: "openai/gpt-3.5-turbo",
+            max_tokens: 256,
             messages: [{ role: "system", content: "You are a memory extraction unit." }, { role: "user", content: extractionPrompt }],
         });
 
@@ -42,33 +43,39 @@ Facts (bullet points):`;
     }
 };
 
+/**
+ * Computes cosine similarity between two vectors
+ */
+const cosineSimilarity = (a, b) => {
+    if (!a || !b || a.length !== b.length) return 0;
+    let dot = 0, normA = 0, normB = 0;
+    for (let i = 0; i < a.length; i++) {
+        dot += a[i] * b[i];
+        normA += a[i] * a[i];
+        normB += b[i] * b[i];
+    }
+    const denom = Math.sqrt(normA) * Math.sqrt(normB);
+    return denom === 0 ? 0 : dot / denom;
+};
+
 export const retrieveRelevantMemories = async (userId, queryEmbedding) => {
     const normalizedUserId = normalizeUserId(userId);
 
     try {
-        const memories = await Memory.aggregate([
-            {
-                $vectorSearch: {
-                    index: "memory_index",
-                    path: "embedding",
-                    queryVector: queryEmbedding,
-                    numCandidates: 100,
-                    limit: 3,
-                    filter: { userId: normalizedUserId }
-                }
-            },
-            { $project: { text: 1, score: { $meta: "vectorSearchScore" } } }
-        ]);
-        return memories.map(m => m.text);
-    } catch (error) {
-        console.error('Memory vector retrieval failed, using fallback:', error.message);
-
-        const fallbackMemories = await Memory.find({ userId: normalizedUserId })
-            .sort({ createdAt: -1 })
-            .limit(3)
+        const memories = await Memory.find({ userId: normalizedUserId })
+            .select('text embedding')
             .lean();
 
-        return fallbackMemories.map(memory => memory.text);
+        if (!memories.length) return [];
+
+        return memories
+            .map(m => ({ text: m.text, score: cosineSimilarity(queryEmbedding, m.embedding) }))
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 3)
+            .map(m => m.text);
+    } catch (error) {
+        console.error('Memory retrieval failed:', error.message);
+        return [];
     }
 };
 

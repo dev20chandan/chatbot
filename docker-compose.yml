@@ -5,24 +5,35 @@ services:
     ports:
       - "5000:5000"
     environment:
-      - MONGODB_URI=mongodb://mongo:27017/saas_chatbot
+      - MONGODB_URI=mongodb://mongo:27017/saas_chatbot?directConnection=true
       - REDIS_URL=redis://redis:6379
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - JWT_SECRET=${JWT_SECRET}
       - NODE_ENV=development
     volumes:
       - .:/app
       - /app/node_modules
     depends_on:
-      - mongo
-      - redis
-  
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
   mongo:
-    image: mongo:latest
+    image: mongodb/atlas
+    privileged: true
+    command: |
+      /bin/bash -c "atlas deployments setup local --type local --port 27017 --bindIpAll --username root --password root --force && tail -f /dev/null"
     ports:
       - "27017:27017"
     volumes:
-      - mongodb_data:/data/db
+      - mongodb_atlas_data:/data
+    healthcheck:
+      test: ["CMD", "mongosh", "--port", "27017", "--eval", "db.adminCommand('ping').ok", "--quiet"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
 
   redis:
     image: redis:alpine
@@ -30,4 +41,4 @@ services:
       - "6379:6379"
 
 volumes:
-  mongodb_data:
+  mongodb_atlas_data:

@@ -83,33 +83,39 @@ export const processDocument = async (userId, file) => {
     }
 };
 
+/**
+ * Computes cosine similarity between two vectors
+ */
+const cosineSimilarity = (a, b) => {
+    if (!a || !b || a.length !== b.length) return 0;
+    let dot = 0, normA = 0, normB = 0;
+    for (let i = 0; i < a.length; i++) {
+        dot += a[i] * b[i];
+        normA += a[i] * a[i];
+        normB += b[i] * b[i];
+    }
+    const denom = Math.sqrt(normA) * Math.sqrt(normB);
+    return denom === 0 ? 0 : dot / denom;
+};
+
 export const retrieveDocumentContext = async (userId, queryEmbedding) => {
     const normalizedUserId = normalizeUserId(userId);
 
     try {
-        const docs = await Document.aggregate([
-            {
-                $vectorSearch: {
-                    index: "document_index",
-                    path: "embedding",
-                    queryVector: queryEmbedding,
-                    numCandidates: 100,
-                    limit: 3,
-                    filter: { userId: normalizedUserId }
-                }
-            },
-            { $project: { text: 1, score: { $meta: "vectorSearchScore" } } }
-        ]);
-        return docs.map(d => d.text);
-    } catch (error) {
-        console.error('Document vector retrieval failed, using fallback:', error.message);
-
-        const fallbackDocs = await Document.find({ userId: normalizedUserId })
-            .sort({ createdAt: -1 })
-            .limit(3)
+        const docs = await Document.find({ userId: normalizedUserId })
+            .select('text embedding')
             .lean();
 
-        return fallbackDocs.map(doc => doc.text);
+        if (!docs.length) return [];
+
+        return docs
+            .map(doc => ({ text: doc.text, score: cosineSimilarity(queryEmbedding, doc.embedding) }))
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 3)
+            .map(d => d.text);
+    } catch (error) {
+        console.error('Document retrieval failed:', error.message);
+        return [];
     }
 };
 
